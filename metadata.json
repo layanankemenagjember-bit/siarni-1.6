@@ -1,0 +1,7 @@
+{
+  "name": "SIARNI JEMBER - Arsip Akta Nikah Digital",
+  "description": "Ekosistem digital pengelolaan arsip akta nikah untuk 31 kecamatan di Kabupaten Jember dengan fitur AI OCR, Watermarking, dan Manajemen Dokumen Berbasis Hash.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
