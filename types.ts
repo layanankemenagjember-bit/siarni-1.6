@@ -21,19 +21,18 @@ export interface KecamatanUser {
 
 export interface MarriageArchive {
   id: string;
-  fileUrl: string;
+  fileUrl?: string; // Tetap ada untuk kompatibilitas
+  fileBase64?: string; // Penyimpanan utama baru
   fileName: string;
   fileHash: string;
   kecamatan: string;
   uploadDate: string;
   extractedData: {
-    // Data Utama Pasangan
     suami: string;
     istri: string;
     nomorAkta: string;
     tanggalNikah: string;
     lokasiNikah: string;
-    // Data Administrasi Arsip (Buku Besar)
     noBerkas: string;
     noItem: string;
     noNB: string;

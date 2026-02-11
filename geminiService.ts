@@ -1,8 +1,9 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const extractMarriageData = async (base64Data: string, mimeType: string = "image/jpeg") => {
+  // Fix: Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -72,6 +73,7 @@ export const extractMarriageData = async (base64Data: string, mimeType: string =
       },
     });
 
+    // Fix: Access response.text as a property, not a method, as per SDK requirements.
     const result = response.text || "{}";
     const cleanJson = result.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleanJson || "{}");

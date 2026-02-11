@@ -1,35 +1,31 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { initializeApp } from "@firebase/app";
+import { initializeFirestore } from "@firebase/firestore";
+import { getAuth } from "@firebase/auth";
 
-// PERHATIAN: Error "permission-denied" yang Anda alami terjadi karena "YOUR_PROJECT_ID" 
-// masih berupa teks placeholder. Silakan ganti dengan data dari Firebase Console Anda.
+// Konfigurasi Firebase SIARNI JEMBER
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyD7ry7T0TS-lLyE96JBaxptOXXpnkhC_k0",
+  authDomain: "siarni-jember.firebaseapp.com",
+  projectId: "siarni-jember",
+  storageBucket: "siarni-jember.firebasestorage.app",
+  messagingSenderId: "323108155926",
+  appId: "1:323108155926:web:a15c04cd102a78e2e1fb37",
+  measurementId: "G-3R3KWHC6CE"
 };
 
-// Cek apakah user sudah mengisi config
-export const isFirebaseConfigured = firebaseConfig.projectId !== "YOUR_PROJECT_ID";
+const app = initializeApp(firebaseConfig);
 
-let app;
-let db: any;
-let storage: any;
+/**
+ * Menggunakan initializeFirestore sebagai ganti getFirestore 
+ * untuk mengaktifkan experimentalForceLongPolling.
+ * Ini memperbaiki error "Could not reach Cloud Firestore backend" 
+ * yang disebabkan oleh blokir WebSocket pada beberapa jaringan.
+ */
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+});
 
-if (isFirebaseConfigured) {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  storage = getStorage(app);
-}
+export const auth = getAuth(app);
 
-export { db, storage };
-
-export const storageConfig = {
-  type: 'cloud-first',
-  syncMode: 'firebase-online',
-  version: '11.2.0'
-};
+// Menandakan konfigurasi sudah diisi
+export const isFirebaseConfigured = true;
