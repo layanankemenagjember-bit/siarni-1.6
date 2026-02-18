@@ -1,8 +1,6 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
-export const extractMarriageData = async (base64Data: string, mimeType: string = "image/jpeg") => {
-  // Fix: Create a new GoogleGenAI instance right before making an API call to ensure it always uses the most up-to-date API key
+export const extractArchiveData = async (base64Data: string, mimeType: string = "image/jpeg") => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
     const response = await ai.models.generateContent({
@@ -16,30 +14,31 @@ export const extractMarriageData = async (base64Data: string, mimeType: string =
             },
           },
           {
-            text: `Extract data from this marriage certificate for a digital archive system. RETURN ONLY JSON.
-            
-            EXTRACT THESE FIELDS:
-            - suami: Full name of the husband (UPPERCASE)
-            - istri: Full name of the wife (UPPERCASE)
-            - nomorAkta: The full registration number
-            - tanggalNikah: Date of marriage (YYYY-MM-DD)
-            - lokasiNikah: District name in Jember
-            - kurunWaktu: The year of the marriage
-            - uraian: Strictly follow this format: "Akta Nikah a.n. [SUAMI] dan [ISTRI]"
-            
-            ADMINISTRATIVE FIELDS (guess or use defaults):
-            - noBerkas: Empty
-            - noItem: Empty
-            - noNB: Empty
-            - kodeKlasifikasi: Default "HK.01"
-            - mediaSimpan: Default "Kertas"
-            - jumlah: Default "1 Berkas"
-            - jangkaSimpan: Default "Permanen"
-            - tingkatPerkembangan: Default "Asli"
-            - nomorBoks: Default "Boks 1"
-            - lokasiSimpan: Default "RAK A BARIS 2"
-            - metodePerlindungan: Default "Vaulting"
-            - keterangan: Default "Asli"`,
+            text: `Extract data from this document for the SIARNI JEMBER digital archive system.
+            Identify if this is a MARRIAGE CERTIFICATE (Buku Nikah) or an EDUCATIONAL DIPLOMA (Ijazah).
+            RETURN ONLY JSON.
+
+            FOR MARRIAGE CERTIFICATES:
+            - category: "PERNIKAHAN"
+            - suami: Husband's name
+            - istri: Wife's name
+            - nomorAkta: Registration number
+            - tanggalNikah: YYYY-MM-DD
+            - uraian: "Akta Nikah a.n. [SUAMI] dan [ISTRI]"
+
+            FOR DIPLOMAS (IJAZAH):
+            - category: "PENDIDIKAN"
+            - namaSiswa: Student's name
+            - nomorIjazah: Serial number
+            - tanggalLulus: Graduation date
+            - namaSekolah: School name
+            - uraian: "Ijazah a.n. [NAMASISWA] ([NAMASEKOLAH])"
+
+            COMMON FIELDS:
+            - kurunWaktu: Year (YYYY)
+            - mediaSimpan: "Kertas"
+            - jangkaSimpan: "Permanen"
+            - tingkatPerkembangan: "Asli"`,
           },
         ],
       },
@@ -48,54 +47,51 @@ export const extractMarriageData = async (base64Data: string, mimeType: string =
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            category: { type: Type.STRING },
             suami: { type: Type.STRING },
             istri: { type: Type.STRING },
             nomorAkta: { type: Type.STRING },
             tanggalNikah: { type: Type.STRING },
-            lokasiNikah: { type: Type.STRING },
-            kurunWaktu: { type: Type.STRING },
+            namaSiswa: { type: Type.STRING },
+            nomorIjazah: { type: Type.STRING },
+            tanggalLulus: { type: Type.STRING },
+            namaSekolah: { type: Type.STRING },
             uraian: { type: Type.STRING },
-            noBerkas: { type: Type.STRING },
-            noItem: { type: Type.STRING },
-            noNB: { type: Type.STRING },
-            kodeKlasifikasi: { type: Type.STRING },
-            mediaSimpan: { type: Type.STRING },
-            jumlah: { type: Type.STRING },
-            jangkaSimpan: { type: Type.STRING },
-            tingkatPerkembangan: { type: Type.STRING },
-            nomorBoks: { type: Type.STRING },
-            lokasiSimpan: { type: Type.STRING },
-            metodePerlindungan: { type: Type.STRING },
-            keterangan: { type: Type.STRING },
+            kurunWaktu: { type: Type.STRING },
           },
-          required: ["suami", "istri", "nomorAkta", "tanggalNikah", "uraian"],
         },
       },
     });
 
-    // Fix: Access response.text as a property, not a method, as per SDK requirements.
     const result = response.text || "{}";
     const cleanJson = result.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(cleanJson || "{}");
     
     return {
       ...parsed,
-      noBerkas: parsed.noBerkas || "",
-      noItem: parsed.noItem || "",
-      noNB: parsed.noNB || "",
-      kodeKlasifikasi: parsed.kodeKlasifikasi || "HK.01",
-      kurunWaktu: parsed.kurunWaktu || (parsed.tanggalNikah ? parsed.tanggalNikah.split('-')[0] : ""),
-      mediaSimpan: parsed.mediaSimpan || "Kertas",
-      jumlah: parsed.jumlah || "1 Berkas",
-      jangkaSimpan: parsed.jangkaSimpan || "Permanen",
-      tingkatPerkembangan: parsed.tingkatPerkembangan || "Asli",
-      nomorBoks: parsed.nomorBoks || "Boks 1",
-      lokasiSimpan: parsed.lokasiSimpan || "RAK A BARIS 2",
-      metodePerlindungan: parsed.metodePerlindungan || "Vaulting",
-      keterangan: parsed.keterangan || "Asli"
+      kodeKlasifikasi: parsed.category === "PERNIKAHAN" ? "HK.01" : "PP.01",
+      mediaSimpan: "Kertas",
+      jumlah: "1 Berkas",
+      jangkaSimpan: "Permanen",
+      tingkatPerkembangan: "Asli",
+      nomorBoks: "Boks 1",
+      lokasiSimpan: "RAK A BARIS 2",
+      metodePerlindungan: "Vaulting",
+      keterangan: "Asli"
     };
   } catch (error) {
     console.error("OCR Error:", error);
-    throw new Error("Gagal mengekstrak data dengan AI. Silakan gunakan input manual.");
+    throw new Error("Gagal OCR. Silakan input manual.");
   }
+};
+
+export const chatAssistant = async (query: string, history: any[]) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: [
+      { role: "user", parts: [{ text: `You are SIARNI Assistant, helping Kemenag Jember staff with archiving. Context: 31 KUA districts and 19 Madrasah institutions. Help them with technical questions about scanning, metadata, or laws. Query: ${query}` }] }
+    ],
+  });
+  return response.text;
 };

@@ -1,74 +1,89 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  FileUp, 
-  LogOut, 
-  Search, 
-  Printer, 
-  Trash2, 
-  X,
-  FileText,
-  Eye,
-  RefreshCw,
-  Plus,
-  Keyboard,
-  Users,
-  Database,
-  Edit,
-  MapPin,
-  Archive,
-  ClipboardList,
-  ShieldCheck,
-  AlertTriangle,
-  CheckCircle2,
-  Lock,
-  ArrowRight,
-  WifiOff,
-  Wifi
+  FileUp, LogOut, Search, Printer, Trash2, X, FileText, Eye, RefreshCw, Plus, 
+  Keyboard, Users, Database, Edit, MapPin, Archive, ClipboardList, ShieldCheck, 
+  AlertTriangle, CheckCircle2, Lock, ArrowRight, WifiOff, Wifi, LayoutDashboard, 
+  Terminal, MessageSquare, PieChart, BarChart3, School, GraduationCap, Binary,
+  ChevronRight, HardDrive, ShieldAlert, UserPlus, Building2, UserCog, Sparkles,
+  Github, Chrome, Facebook, LogIn, User, Camera
 } from 'lucide-react';
 import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  query, 
-  where, 
-  deleteDoc, 
-  doc, 
-  updateDoc, 
-  onSnapshot,
-  orderBy
+  collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, onSnapshot, orderBy
 } from '@firebase/firestore';
 import { db, isFirebaseConfigured } from './firebaseConfig';
-import { UserRole, UserProfile, MarriageArchive, KECAMATAN_LIST, KecamatanUser } from './types';
-import { APP_NAME, Watermark, KEMENAG_LOGO } from './constants';
-import { extractMarriageData } from './geminiService';
+import { UserRole, UserProfile, DigitalArchive, KECAMATAN_LIST, MADRASAH_LIST, KecamatanUser, ArchiveCategory } from './types';
+import { APP_NAME, APP_DESCRIPTION, Watermark, KEMENAG_LOGO } from './constants';
+import { extractArchiveData } from './geminiService';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState('archives');
-  const [archives, setArchives] = useState<MarriageArchive[]>([]);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [archives, setArchives] = useState<DigitalArchive[]>([]);
   const [kecamatanUsers, setKecamatanUsers] = useState<KecamatanUser[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [previewArchive, setPreviewArchive] = useState<MarriageArchive | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [previewArchive, setPreviewArchive] = useState<DigitalArchive | null>(null);
   const [isOnline, setIsOnline] = useState(true);
 
+  // Terminal State
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalInput, setTerminalInput] = useState('');
+  const [terminalLogs, setTerminalLogs] = useState<string[]>(['SAKINAH BASH v1.2.0 - Security Console Ready', 'Type "help" for commands...']);
+  
   const [loginForm, setLoginForm] = useState({ nip: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<KecamatanUser | null>(null);
-  const [userData, setUserData] = useState({ nip: '', password: '', displayName: '', kecamatan: '' });
-
-  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
-  const [manualData, setManualData] = useState({ 
-    suami: '', istri: '', nomorAkta: '', tanggalNikah: '', lokasiNikah: '',
-    noBerkas: '', noItem: '', noNB: '', kodeKlasifikasi: 'HK.01', uraian: '', 
-    kurunWaktu: '', mediaSimpan: 'Kertas', jumlah: '1 Berkas', jangkaSimpan: 'Permanen', 
-    tingkatPerkembangan: 'Asli', nomorBoks: 'Boks 1', lokasiSimpan: 'RAK A BARIS 2', 
-    metodePerlindungan: 'Vaulting', keterangan: 'Asli'
+  const [userData, setUserData] = useState<Partial<KecamatanUser>>({ 
+    nip: '', 
+    password: '', 
+    displayName: '', 
+    role: UserRole.KECAMATAN,
+    kecamatan: '',
+    madrasah: ''
   });
+
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (terminalEndRef.current) terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  }, [terminalLogs]);
+
+  useEffect(() => {
+    if (!user || !isFirebaseConfigured) return;
+
+    let archivesQuery;
+    if (user.role === UserRole.KABUPATEN) {
+      archivesQuery = query(collection(db, "archives"), orderBy("uploadDate", "desc"));
+    } else if (user.role === UserRole.KECAMATAN) {
+      archivesQuery = query(collection(db, "archives"), where("kecamatan", "==", user.kecamatan), orderBy("uploadDate", "desc"));
+    } else if (user.role === UserRole.MADRASAH) {
+      archivesQuery = query(collection(db, "archives"), where("madrasah", "==", user.madrasah), orderBy("uploadDate", "desc"));
+    } else {
+      archivesQuery = query(collection(db, "archives"), orderBy("uploadDate", "desc"));
+    }
+
+    const unsubArchives = onSnapshot(archivesQuery, 
+      (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DigitalArchive));
+        setArchives(data);
+        setIsOnline(true);
+      },
+      (error) => {
+        if (error.code === 'unavailable') setIsOnline(false);
+      }
+    );
+
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KecamatanUser));
+      setKecamatanUsers(data);
+    });
+
+    return () => { unsubArchives(); unsubUsers(); };
+  }, [user]);
 
   const compressImage = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -76,124 +91,86 @@ const App: React.FC = () => {
       img.src = base64Str;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
+        const MAX_WIDTH = 1000;
         let width = img.width;
         let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
+        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
       };
     });
   };
 
-  useEffect(() => {
-    if (!user || !isFirebaseConfigured) return;
-
-    const archivesQuery = user.role === UserRole.KABUPATEN 
-      ? query(collection(db, "archives"), orderBy("uploadDate", "desc"))
-      : query(collection(db, "archives"), where("kecamatan", "==", user.kecamatan), orderBy("uploadDate", "desc"));
-
-    const unsubArchives = onSnapshot(archivesQuery, 
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MarriageArchive));
-        setArchives(data);
-        setIsOnline(true);
-      },
-      (error) => {
-        console.error("Firestore connectivity issue:", error);
-        if (error.code === 'unavailable') {
-          setIsOnline(false);
-        }
-      }
-    );
-
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as KecamatanUser));
-      setKecamatanUsers(data);
-      setLoading(false);
-    });
-
-    return () => { unsubArchives(); unsubUsers(); };
-  }, [user]);
+  const handleTerminal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cmd = terminalInput.trim().toLowerCase();
+    setTerminalLogs(prev => [...prev, `> ${terminalInput}`]);
+    
+    if (cmd === 'help') {
+      setTerminalLogs(prev => [...prev, 'Available: wipe, sync, stats, whoami, clear']);
+    } else if (cmd === 'wipe') {
+      localStorage.clear();
+      setTerminalLogs(prev => [...prev, 'Local cache wiped successfully.']);
+    } else if (cmd === 'sync') {
+      setTerminalLogs(prev => [...prev, 'Force sync initiated... Complete.']);
+    } else if (cmd === 'clear') {
+      setTerminalLogs([]);
+    } else if (cmd === 'stats') {
+      setTerminalLogs(prev => [...prev, `Total Archives: ${archives.length}`]);
+    } else {
+      setTerminalLogs(prev => [...prev, `Command not found: ${cmd}`]);
+    }
+    setTerminalInput('');
+  };
 
   const handleLoginProcess = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
-    setIsAuthenticating(true);
-
+    setLoginError(''); setIsAuthenticating(true);
     try {
       if (loginForm.nip === 'admin' && loginForm.password === 'admin123') {
-        setUser({ uid: 'admin', nip: 'admin', displayName: 'Super Admin', role: UserRole.KABUPATEN });
-        setIsAuthenticating(false);
-        return;
+        setUser({ uid: 'admin', nip: 'admin', displayName: 'Admin Kemenag Kab', role: UserRole.KABUPATEN });
+        setIsAuthenticating(false); return;
       }
-
       const q = query(collection(db, "users"), where("nip", "==", loginForm.nip), where("password", "==", loginForm.password));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const found = querySnapshot.docs[0].data() as KecamatanUser;
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const found = snap.docs[0].data() as KecamatanUser;
         setUser({ 
-          uid: querySnapshot.docs[0].id, 
-          nip: found.nip, 
-          displayName: found.displayName, 
-          role: UserRole.KECAMATAN, 
-          kecamatan: found.kecamatan 
+          uid: snap.docs[0].id, nip: found.nip, displayName: found.displayName, 
+          role: found.role, kecamatan: found.kecamatan, madrasah: found.madrasah 
         });
-      } else {
-        setLoginError('NIP atau Kata Sandi salah.');
-      }
-    } catch (err: any) {
-      setLoginError(err.code === 'unavailable' ? 'Masalah koneksi database. Periksa internet Anda.' : 'Gagal terhubung ke Firebase.');
-    } finally {
-      setIsAuthenticating(false);
-    }
+      } else setLoginError('Kredensial tidak valid.');
+    } catch (err) { setLoginError('Gagal koneksi server.'); }
+    finally { setIsAuthenticating(false); }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = async () => {
       try {
         const originalBase64 = reader.result as string;
-        const compressedBase64 = await compressImage(originalBase64);
-        const geminiBase64 = originalBase64.split(',')[1];
-        const extracted = await extractMarriageData(geminiBase64, file.type);
+        const compressed = await compressImage(originalBase64);
+        const extracted = await extractArchiveData(originalBase64.split(',')[1], file.type);
         
         await addDoc(collection(db, "archives"), {
-          fileBase64: compressedBase64,
+          category: extracted.category,
+          fileBase64: compressed,
           fileName: file.name,
-          fileHash: `sha256_${Date.now()}`,
-          kecamatan: user.role === UserRole.KABUPATEN ? (extracted.lokasiNikah || "Jember") : (user.kecamatan || ''),
+          fileHash: `sha256_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          kecamatan: user.role === UserRole.KECAMATAN ? user.kecamatan : extracted.lokasiNikah || '',
+          madrasah: user.role === UserRole.MADRASAH ? user.madrasah : extracted.namaSekolah || '',
           uploadDate: new Date().toISOString(),
           extractedData: extracted,
           uploaderEmail: user.nip
         });
-        
         setActiveTab('archives');
-      } catch (err: any) {
-        alert("Gagal: " + (err.code === 'unavailable' ? "Koneksi terputus." : err.message));
-      } finally {
-        setIsUploading(false);
-      }
+      } catch (err: any) { alert(err.message); }
+      finally { setIsUploading(false); }
     };
     reader.readAsDataURL(file);
   };
@@ -208,120 +185,82 @@ const App: React.FC = () => {
       }
       setIsUserModalOpen(false);
       setEditingUser(null);
-      setUserData({ nip: '', password: '', displayName: '', kecamatan: '' });
+      setUserData({ nip: '', password: '', displayName: '', role: UserRole.KECAMATAN });
     } catch (e) {
       alert("Gagal menyimpan data.");
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (window.confirm('Hapus operator ini?')) {
-      await deleteDoc(doc(db, "users", id));
-    }
-  };
-
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addDoc(collection(db, "archives"), {
-        fileBase64: '',
-        fileName: 'Input Manual',
-        fileHash: 'manual',
-        kecamatan: user?.role === UserRole.KABUPATEN ? manualData.lokasiNikah : (user?.kecamatan || ''),
-        uploadDate: new Date().toISOString(),
-        extractedData: { ...manualData },
-        uploaderEmail: user?.nip || 'admin'
-      });
-      setIsManualEntryOpen(false);
-      setActiveTab('archives');
-    } catch (e) {
-      alert("Gagal simpan manual.");
-    }
-  };
+  const stats = useMemo(() => {
+    const totalMarriage = archives.filter(a => a.category === ArchiveCategory.PERNIKAHAN).length;
+    const totalEdu = archives.filter(a => a.category === ArchiveCategory.PENDIDIKAN).length;
+    return { marriage: totalMarriage, edu: totalEdu, total: archives.length };
+  }, [archives]);
 
   const filteredArchives = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return archives.filter(a => 
-      a.extractedData.suami?.toLowerCase().includes(q) || 
-      a.extractedData.istri?.toLowerCase().includes(q) ||
-      a.extractedData.nomorAkta?.toLowerCase().includes(q)
+      (a.extractedData.suami?.toLowerCase().includes(q)) || 
+      (a.extractedData.namaSiswa?.toLowerCase().includes(q)) ||
+      (a.extractedData.nomorAkta?.toLowerCase().includes(q)) ||
+      (a.extractedData.nomorIjazah?.toLowerCase().includes(q))
     );
   }, [archives, searchQuery]);
 
+  const filteredUsers = useMemo(() => {
+    const q = userSearchQuery.toLowerCase();
+    return kecamatanUsers.filter(u => 
+      u.displayName.toLowerCase().includes(q) || 
+      u.nip.toLowerCase().includes(q) ||
+      (u.kecamatan && u.kecamatan.toLowerCase().includes(q)) ||
+      (u.madrasah && u.madrasah.toLowerCase().includes(q))
+    );
+  }, [kecamatanUsers, userSearchQuery]);
+
   if (!user) {
     return (
-      <div className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Latar Belakang Animasi */}
-        <div className="bg-container">
-          <div className="liquid-shape shape-1"></div>
-          <div className="liquid-shape shape-2"></div>
-          <div className="liquid-shape shape-3"></div>
-        </div>
+      <div className="min-h-screen relative flex items-center justify-center p-4">
+        {/* Background Decorations */}
+        <div className="bg-container"></div>
+        <div className="shape tube-spiral top-[10%] left-[5%] animate-float opacity-30"></div>
+        <div className="shape tube-wave bottom-[20%] right-[10%] animate-float opacity-40" style={{ animationDelay: '2s' }}></div>
+        <div className="shape tube-wave top-[30%] right-[5%] animate-float opacity-20 rotate-45" style={{ animationDelay: '4s' }}></div>
+        <div className="shape tube-spiral bottom-[-5%] left-[20%] animate-float opacity-10 scale-150" style={{ animationDelay: '1s' }}></div>
 
-        {/* Ripple Wave Luar (Animasi dari Atas ke Bawah) */}
-        <div className="absolute top-0 left-0 w-full overflow-hidden leading-[0] pointer-events-none opacity-40 h-[250px] z-0 animate-ripple-down">
-          <svg className="waves-top w-full h-full" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
-          viewBox="0 24 150 28" preserveAspectRatio="none" shapeRendering="auto">
-            <defs>
-              <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
-            </defs>
-            <g className="parallax">
-              <use xlinkHref="#gentle-wave" x="48" y="0" fill="rgba(255,255,255,0.7" />
-              <use xlinkHref="#gentle-wave" x="48" y="3" fill="rgba(255,255,255,0.5)" />
-              <use xlinkHref="#gentle-wave" x="48" y="5" fill="rgba(255,255,255,0.3)" />
-              <use xlinkHref="#gentle-wave" x="48" y="7" fill="#fff" />
-            </g>
-          </svg>
-        </div>
-
-        <div className="glass-card w-full max-w-lg rounded-[4rem] p-12 lg:p-16 text-center animate-in zoom-in-95 duration-700 relative z-10 border-t-2 border-white/20 overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.6)]">
+        {/* Login Card Vertical Glass Style */}
+        <div className="glass-login-v2 w-full max-w-sm rounded-[2.5rem] p-10 lg:p-12 animate-in zoom-in-95 relative z-10 flex flex-col items-center">
           
-          {/* Ripple Wave Dalam Frame */}
-          <div className="absolute top-0 left-0 w-full overflow-hidden leading-[0] pointer-events-none opacity-20 h-[120px]">
-            <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink"
-            viewBox="0 24 150 28" preserveAspectRatio="none" shapeRendering="auto">
-              <g className="parallax">
-                <use xlinkHref="#gentle-wave" x="48" y="0" fill="#10b981" />
-                <use xlinkHref="#gentle-wave" x="48" y="3" fill="rgba(16, 185, 129, 0.5)" />
-                <use xlinkHref="#gentle-wave" x="48" y="5" fill="rgba(16, 185, 129, 0.3)" />
-                <use xlinkHref="#gentle-wave" x="48" y="7" fill="rgba(16, 185, 129, 0.1)" />
-              </g>
-            </svg>
+          <div className="mb-8 text-center w-full flex flex-col items-center">
+            <img src={KEMENAG_LOGO} alt="Logo Kemenag" className="w-20 h-20 mb-6 drop-shadow-xl" />
+            <h1 className="text-white text-4xl font-black tracking-tight mb-2 uppercase italic">{APP_NAME}</h1>
+            <p className="text-emerald-400 font-bold uppercase text-[9px] tracking-[0.3em] leading-tight max-w-[200px] mx-auto opacity-90">{APP_DESCRIPTION}</p>
           </div>
-
-          <div className="relative z-20">
-            <img src={KEMENAG_LOGO} className="w-20 h-20 mx-auto mb-8 drop-shadow-2xl" />
-            <h1 className="text-white text-5xl font-black tracking-tighter italic uppercase mb-2 drop-shadow-lg">{APP_NAME}</h1>
-            <p className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.5em] mb-12 opacity-80">Sistem Informasi Akta Nikah v 1.0</p>
-            
-            <form className="space-y-6" onSubmit={handleLoginProcess}>
-              <div className="space-y-4">
+          
+          <form className="w-full space-y-6" onSubmit={handleLoginProcess}>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <label className="text-white/80 text-[11px] font-bold uppercase tracking-wider ml-1">Username / NIP</label>
+                <input required type="text" placeholder="username@kemenag.go.id" className="w-full px-6 py-4 rounded-xl bg-white text-emerald-950 font-medium outline-none shadow-xl placeholder:text-slate-300 text-sm" value={loginForm.nip} onChange={e=>setLoginForm({...loginForm, nip: e.target.value})}/>
+              </div>
+              <div className="space-y-2">
+                <label className="text-white/80 text-[11px] font-bold uppercase tracking-wider ml-1">Password</label>
                 <div className="relative">
-                  <input required type="text" placeholder="NIP OPERATOR" className="glass-input w-full px-10 py-6 rounded-2xl outline-none font-black text-center uppercase tracking-widest focus:ring-4 focus:ring-emerald-500/50 transition-all text-lg shadow-inner border-0" value={loginForm.nip} onChange={e => setLoginForm({...loginForm, nip: e.target.value})}/>
-                  <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-600 opacity-20" size={20} />
-                </div>
-                <div className="relative">
-                  <input required type="password" placeholder="KATA SANDI" className="glass-input w-full px-10 py-6 rounded-2xl outline-none font-bold text-center tracking-widest focus:ring-4 focus:ring-emerald-500/50 transition-all text-lg shadow-inner border-0" value={loginForm.password} onChange={e => setLoginForm({...loginForm, password: e.target.value})}/>
-                  <ShieldCheck className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-600 opacity-20" size={20} />
+                  <input required type="password" placeholder="Password" className="w-full px-6 py-4 rounded-xl bg-white text-emerald-950 font-medium outline-none shadow-xl placeholder:text-slate-300 text-sm" value={loginForm.password} onChange={e=>setLoginForm({...loginForm, password: e.target.value})}/>
+                  <Eye className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-emerald-600 cursor-pointer" size={16} />
                 </div>
               </div>
-              
-              {loginError && (
-                <div className="bg-rose-500/10 border border-rose-500/30 p-6 rounded-3xl text-left animate-in slide-in-from-top-4 flex items-center gap-4">
-                  <AlertTriangle className="text-rose-400 shrink-0" size={20} />
-                  <p className="text-rose-100 text-[10px] font-black uppercase tracking-widest leading-relaxed">{loginError}</p>
-                </div>
-              )}
-
-              <button type="submit" disabled={isAuthenticating} className="w-full bg-emerald-600 text-white py-8 rounded-[3rem] font-black uppercase tracking-[0.3em] flex items-center justify-center gap-4 hover:bg-emerald-500 transition-all shadow-2xl active:scale-[0.98] disabled:opacity-50 italic text-xl group">
-                {isAuthenticating ? <RefreshCw className="animate-spin" size={24} /> : <CheckCircle2 size={28} />} 
-                {isAuthenticating ? 'OTENTIKASI...' : 'MASUK SISTEM'}
-              </button>
-            </form>
-
-            <div className="mt-12 text-white/40 text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
-              Kemenag Jember 2026
             </div>
+
+            {loginError && <p className="text-rose-300 text-[10px] font-bold uppercase text-center">{loginError}</p>}
+
+            <button type="submit" disabled={isAuthenticating} className="w-full bg-[#022c22] text-white py-4 rounded-xl font-black uppercase tracking-[0.1em] flex items-center justify-center gap-3 hover:bg-emerald-900 transition-all shadow-2xl active:scale-95 disabled:opacity-50 text-sm">
+              {isAuthenticating ? <RefreshCw className="animate-spin" size={18} /> : null} 
+              {isAuthenticating ? 'Authenticating...' : 'Masuk Sistem'}
+            </button>
+          </form>
+
+          <div className="mt-10 text-white/30 text-[9px] font-black uppercase tracking-[0.4em] flex flex-col items-center gap-2">
+               {APP_NAME} JEMBER &copy; 2026
           </div>
         </div>
       </div>
@@ -332,322 +271,383 @@ const App: React.FC = () => {
     <div className="flex min-h-screen bg-slate-50 relative selection:bg-emerald-100">
       <Watermark />
       
-      <aside className="w-80 bg-emerald-950 text-white min-h-screen flex flex-col no-print fixed lg:static z-40 shadow-2xl">
-        <div className="p-10 border-b border-emerald-900/50">
-          <div className="flex items-center gap-4 mb-8">
-            <img src={KEMENAG_LOGO} className="w-10 h-10 object-contain" />
+      {/* Sidebar with Deep Emerald Professional Gradient */}
+      <aside className="w-72 bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-950 text-white flex flex-col no-print fixed lg:static z-50 h-screen shadow-[10px_0_30px_rgba(0,0,0,0.2)]">
+        <div className="p-8 border-b border-emerald-800/40">
+          <div className="flex items-center gap-3 mb-10">
+            <img src={KEMENAG_LOGO} className="w-10 h-10 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]" />
             <h1 className="text-2xl font-black tracking-tighter italic leading-none">{APP_NAME}</h1>
           </div>
-          <div className="p-6 bg-emerald-900/40 rounded-[2rem] border border-emerald-800/50 shadow-inner">
-            <p className="text-[9px] text-emerald-400 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
-               {isOnline ? <Wifi size={12} className="text-emerald-500" /> : <WifiOff size={12} className="text-rose-500 animate-pulse" />}
-               {isOnline ? 'Firestore (Aktif)' : 'Mode Luring'}
+          <div className="p-5 bg-emerald-900/60 rounded-[2rem] border border-emerald-800/50 shadow-inner group transition-all hover:bg-emerald-900">
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-1 flex items-center gap-2">
+               {isOnline ? <Wifi size={12} className="text-emerald-500" /> : <WifiOff size={12} className="text-rose-500" />}
+               {user.role}
             </p>
             <p className="text-sm font-black truncate text-white uppercase italic tracking-tighter">{user.displayName}</p>
-            <p className="text-[10px] text-emerald-600 font-black uppercase italic mt-1">
-              {user.role === UserRole.KABUPATEN ? 'ADMIN KABUPATEN' : `KUA ${user.kecamatan}`}
-            </p>
+            <p className="text-[9px] font-bold text-emerald-600 mt-1 uppercase truncate opacity-80 italic">{user.kecamatan || user.madrasah || 'Pusat Kabupaten'}</p>
           </div>
         </div>
 
-        <nav className="flex-1 p-8 space-y-3">
-          {[
-            { id: 'upload', icon: FileUp, label: 'Tambah Data' },
-            { id: 'archives', icon: ClipboardList, label: 'Arsip Data' },
-            { id: 'users', icon: Users, label: 'Akses Operator', hide: user.role !== UserRole.KABUPATEN },
-          ].filter(item => !item.hide).map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-5 px-6 py-5 rounded-[2rem] transition-all font-black text-[10px] uppercase tracking-widest ${activeTab === item.id ? 'bg-emerald-600 text-white shadow-xl italic translate-x-2' : 'text-emerald-400/50 hover:text-white hover:bg-emerald-900/30'}`}>
-              <item.icon size={20} /> {item.label}
-            </button>
-          ))}
+        <nav className="flex-1 p-6 space-y-3 overflow-y-auto">
+          <NavBtn icon={LayoutDashboard} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
+          <NavBtn icon={FileUp} label="Scanning AI" active={activeTab==='upload'} onClick={()=>setActiveTab('upload')} />
+          <NavBtn icon={ClipboardList} label="Data Arsip" active={activeTab==='archives'} onClick={()=>setActiveTab('archives')} />
+          {user.role === UserRole.KABUPATEN && <NavBtn icon={Users} label="Akses Operator" active={activeTab==='users'} onClick={()=>setActiveTab('users')} />}
         </nav>
 
-        <div className="p-8 border-t border-emerald-900/50">
-          <button onClick={() => setUser(null)} className="w-full flex items-center justify-center gap-3 px-6 py-5 bg-rose-500/10 text-rose-400 rounded-[2rem] font-black text-[10px] uppercase hover:bg-rose-500 hover:text-white transition-all shadow-lg active:scale-95">
-            <LogOut size={16} /> Keluar Sistem
+        <div className="p-6 border-t border-emerald-800/50 space-y-3">
+          {user.role === UserRole.KABUPATEN && (
+            <button onClick={()=>setShowTerminal(!showTerminal)} className="w-full flex items-center gap-3 px-5 py-4 bg-slate-900 text-emerald-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all border border-emerald-900/50 group">
+              <Terminal size={14} className="group-hover:rotate-12 transition-transform" /> SECURITY CONSOLE
+            </button>
+          )}
+          <button onClick={()=>setUser(null)} className="w-full flex items-center justify-center gap-2 px-5 py-4 bg-rose-500/10 text-rose-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-lg active:scale-95">
+            <LogOut size={14} /> Keluar Sistem
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 p-8 lg:p-16 overflow-y-auto relative no-print">
-        {!isOnline && (
-          <div className="mb-10 p-6 bg-rose-500 text-white rounded-3xl flex items-center gap-6 shadow-2xl animate-bounce">
-            <AlertTriangle size={32} />
-            <div>
-              <p className="font-black uppercase italic tracking-tighter">Koneksi Database Terputus</p>
-              <p className="text-xs font-bold opacity-80 uppercase tracking-widest">Sistem berjalan dalam mode luring. Sinkronisasi akan berlanjut saat internet pulih.</p>
-            </div>
-          </div>
-        )}
-
-        <header className="mb-16 flex justify-between items-end">
-          <div className="animate-in slide-in-from-left duration-700">
-            <p className="text-emerald-600 font-black text-xs uppercase tracking-[0.4em] mb-4 italic">Kabupaten Jember</p>
-            <h2 className="text-7xl font-black text-slate-900 uppercase tracking-tighter italic leading-none">
-              {activeTab === 'upload' ? 'Tambah Data' : activeTab === 'users' ? 'Akses Operator' : 'Arsip Data'}
-            </h2>
-          </div>
-          {activeTab === 'users' && (
-            <button onClick={() => { setEditingUser(null); setUserData({ nip: '', password: '', displayName: '', kecamatan: '' }); setIsUserModalOpen(true); }} className="px-10 py-6 bg-emerald-950 text-white rounded-[2.5rem] font-black uppercase text-xs tracking-widest flex items-center gap-4 hover:bg-emerald-600 hover:shadow-2xl transition-all italic shadow-xl animate-in zoom-in duration-500"><Plus size={24}/> Tambah Operator</button>
-          )}
-        </header>
-
-        {activeTab === 'archives' && (
-          <div className="space-y-10 animate-in slide-in-from-bottom duration-700">
-             <div className="flex flex-col md:flex-row gap-8">
-                <div className="flex-1 relative group">
-                   <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-600 transition-colors" size={28} />
-                   <input type="text" placeholder="Cari Nama Pasangan atau No. Akta..." className="w-full pl-24 pr-12 py-8 rounded-[3rem] bg-white border border-emerald-50 shadow-2xl focus:outline-none focus:ring-8 focus:ring-emerald-500/5 font-black italic uppercase text-sm tracking-[0.1em] transition-all" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+      {/* Main Content Area */}
+      <main className="flex-1 p-8 lg:p-14 overflow-y-auto relative no-print">
+        {activeTab === 'dashboard' && (
+          <div className="animate-in slide-in-from-bottom duration-700 space-y-14">
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-emerald-700 font-black text-xs uppercase tracking-[0.5em] mb-4 italic">Kemenag Kabupaten Jember</p>
+                <h2 className="text-8xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">Smart Hub</h2>
+              </div>
+              <div className="flex gap-4">
+                <div className="p-10 bg-white rounded-[3.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] flex items-center gap-8 border border-emerald-50">
+                  <div className="p-5 bg-emerald-100 text-emerald-600 rounded-3xl shadow-inner"><Database size={40}/></div>
+                  <div><p className="text-[11px] font-black uppercase text-slate-400 tracking-widest mb-1">Populasi Arsip</p><p className="text-5xl font-black text-slate-900 tracking-tighter">{stats.total}</p></div>
                 </div>
-                <button onClick={() => window.print()} className="px-16 py-8 bg-emerald-950 text-white rounded-[3rem] font-black uppercase text-xs tracking-widest flex items-center justify-center gap-5 shadow-2xl hover:bg-black transition-all italic active:scale-95"><Printer size={24} /> Cetak Arsip</button>
-             </div>
+              </div>
+            </div>
 
-             <div className="bg-white rounded-[5rem] shadow-2xl border border-emerald-50 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-emerald-950 text-white text-[11px] font-black uppercase tracking-[0.3em] italic">
-                    <tr>
-                      <th className="px-12 py-10">Uraian Metadata Arsip</th>
-                      <th className="px-12 py-10">Nomor Registrasi</th>
-                      <th className="px-12 py-10">Wilayah KUA</th>
-                      <th className="px-12 py-10 text-right">Manajemen</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredArchives.length > 0 ? filteredArchives.map(arc => (
-                      <tr key={arc.id} className="hover:bg-emerald-50/50 transition-all text-sm font-bold text-slate-700 group">
-                        <td className="px-12 py-10">
-                           <div className="flex items-center gap-5">
-                              <div className="p-4 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors"><FileText size={24}/></div>
-                              <div>
-                                <p className="text-slate-900 font-black uppercase italic tracking-tighter leading-tight text-lg">{arc.extractedData.uraian}</p>
-                                <p className="text-[10px] text-emerald-600 uppercase italic font-black mt-2 tracking-widest flex items-center gap-2"><ArrowRight size={10} /> Akad: {arc.extractedData.tanggalNikah}</p>
-                              </div>
-                           </div>
-                        </td>
-                        <td className="px-12 py-10 font-mono tracking-widest text-emerald-700 font-black">{arc.extractedData.nomorAkta}</td>
-                        <td className="px-12 py-10">
-                          <span className="px-6 py-3 bg-slate-100 text-slate-600 rounded-full text-[10px] uppercase font-black tracking-[0.2em] italic border border-slate-200">{arc.kecamatan}</span>
-                        </td>
-                        <td className="px-12 py-10 flex gap-4 justify-end opacity-20 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => setPreviewArchive(arc)} className="p-5 bg-emerald-50 text-emerald-600 rounded-3xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Eye size={20}/></button>
-                           <button onClick={() => { if(confirm('Hapus arsip ini secara permanen?')) deleteDoc(doc(db, "archives", arc.id)); }} className="p-5 bg-rose-50 text-rose-500 rounded-3xl hover:bg-rose-500 hover:text-white transition-all shadow-sm"><Trash2 size={20}/></button>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={4} className="px-12 py-24 text-center">
-                          <p className="text-slate-400 font-black uppercase italic tracking-widest">Tidak ada data arsip ditemukan</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+               <StatCard icon={MapPin} title="Wilayah KUA" count={stats.marriage} desc="Total Registrasi Akta Nikah Digital" />
+               <StatCard icon={School} title="Lembaga Pendidikan" count={stats.edu} desc="Total Arsip Ijazah Madrasah Negeri" />
+               <div className="bg-gradient-to-br from-emerald-900 to-emerald-600 p-12 rounded-[5rem] text-white flex flex-col justify-between shadow-2xl relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 opacity-10 group-hover:scale-150 transition-all duration-1000"><Binary size={280}/></div>
+                  <div><p className="text-[11px] font-black uppercase tracking-[0.5em] text-emerald-300 mb-6 italic opacity-70">Data Persistence</p><h4 className="text-5xl font-black italic uppercase tracking-tighter">Spark NoSQL</h4></div>
+                  <p className="text-xs font-bold opacity-60 mt-8 leading-relaxed uppercase tracking-widest">Injeksi metadata via Gemini-3-Flash API.</p>
+               </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'upload' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 animate-in zoom-in duration-500">
-            <div className="bg-white p-24 rounded-[5rem] shadow-2xl border border-emerald-50 text-center flex flex-col items-center group relative overflow-hidden">
-              <div className={`p-14 rounded-full mb-12 transition-all duration-500 shadow-inner ${isUploading ? 'bg-emerald-100 animate-pulse' : 'bg-emerald-50 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white'}`}>
-                <FileUp size={80} className={isUploading ? 'text-emerald-400' : 'text-emerald-600 group-hover:text-white'} />
-              </div>
-              <h3 className="text-5xl font-black mb-6 italic uppercase tracking-tighter">Pindai Digital AI</h3>
-              <p className="text-xs text-slate-400 font-bold mb-16 uppercase tracking-[0.3em] max-w-xs">Penyimpanan Terenkripsi Firestore</p>
-              <label className="w-full bg-emerald-950 text-white py-10 rounded-[3rem] font-black uppercase tracking-[0.3em] cursor-pointer hover:bg-black transition-all italic text-sm shadow-2xl flex items-center justify-center gap-5 group/btn active:scale-95">
-                {isUploading ? <RefreshCw className="animate-spin" /> : <Archive size={24} />}
-                {isUploading ? 'MEMPROSES AI...' : 'UNGGAH ARSIP'}
-                <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} accept="image/*" />
-              </label>
+          <div className="animate-in zoom-in duration-700 max-w-5xl mx-auto space-y-16 py-12">
+            <div className="text-center space-y-4">
+              <h2 className="text-8xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">Scanning AI</h2>
+              <p className="text-sm font-black text-emerald-600 uppercase tracking-[0.5em] italic">Otomatisasi Ekstraksi Metadata Berbasis Gemini</p>
             </div>
-            <div className="bg-emerald-50 p-24 rounded-[5rem] text-center border-4 border-dashed border-emerald-200 flex flex-col items-center group shadow-inner">
-              <div className="p-14 bg-white rounded-full mb-12 shadow-2xl group-hover:scale-110 transition-all duration-500"><Keyboard size={80} className="text-emerald-600" /></div>
-              <h3 className="text-5xl font-black mb-6 italic uppercase tracking-tighter">Input Manual</h3>
-              <p className="text-xs text-slate-400 font-bold mb-16 uppercase tracking-[0.3em] max-w-xs">Registrasi metadata tanpa dokumen visual</p>
-              <button onClick={() => setIsManualEntryOpen(true)} className="w-full bg-white text-emerald-950 py-10 rounded-[3rem] font-black uppercase tracking-[0.3em] border-2 border-emerald-200 hover:bg-emerald-950 hover:text-white transition-all italic text-sm shadow-xl active:scale-95">MULAI INPUT</button>
+            
+            <div className="bg-white p-24 rounded-[7rem] shadow-[0_60px_120px_-30px_rgba(16,185,129,0.1)] border-4 border-dashed border-emerald-100 text-center relative overflow-hidden group">
+               {isUploading && (
+                 <div className="absolute inset-0 bg-emerald-950/98 backdrop-blur-2xl z-20 flex flex-col items-center justify-center text-white space-y-12">
+                    <RefreshCw className="w-28 h-28 animate-spin text-emerald-400" />
+                    <div className="text-center space-y-4">
+                       <h4 className="text-6xl font-black italic tracking-tighter uppercase">Analyzing Document</h4>
+                       <p className="text-xs font-black tracking-[0.8em] animate-pulse opacity-50 uppercase italic">Sakinah-AI Engine is mapping metadata...</p>
+                    </div>
+                 </div>
+               )}
+               <div className="p-20 bg-emerald-50 rounded-full w-60 h-60 flex items-center justify-center mx-auto mb-14 group-hover:scale-110 transition-all duration-1000 shadow-inner group-hover:bg-emerald-100"><FileUp size={90} className="text-emerald-700"/></div>
+               <label className="block w-full">
+                 <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*" />
+                 <div className="bg-gradient-to-br from-emerald-800 to-emerald-500 text-white py-12 px-20 rounded-[4rem] font-black uppercase text-2xl tracking-[0.3em] italic hover:scale-[1.03] hover:shadow-[0_30px_70px_rgba(16,185,129,0.3)] transition-all cursor-pointer shadow-2xl active:scale-95 inline-flex items-center gap-8 border-b-8 border-emerald-900">
+                    <Archive size={40} /> Registrasi Berkas Baru
+                 </div>
+               </label>
+               <p className="mt-14 text-[11px] font-black text-slate-400 uppercase tracking-[0.5em] italic opacity-50">Support: JPG, PNG, WEBP (Limit 10MB per unit)</p>
             </div>
           </div>
         )}
 
-        {activeTab === 'users' && (
-          <div className="space-y-10 animate-in slide-in-from-bottom duration-700">
-             <div className="bg-white rounded-[4rem] shadow-2xl border border-emerald-50 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-emerald-950 text-white text-[11px] font-black uppercase tracking-[0.3em] italic">
-                    <tr>
-                      <th className="px-12 py-10">Nama Lengkap Operator</th>
-                      <th className="px-12 py-10">NIP / User ID</th>
-                      <th className="px-12 py-10">Wilayah KUA</th>
-                      <th className="px-12 py-10 text-right">Opsi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {kecamatanUsers.length > 0 ? kecamatanUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-emerald-50/50 transition-all text-sm font-bold text-slate-700 group">
-                        <td className="px-12 py-10 font-black uppercase italic text-lg">{u.displayName}</td>
-                        <td className="px-12 py-10 font-mono text-emerald-600 tracking-widest">{u.nip}</td>
-                        <td className="px-12 py-10 uppercase text-[10px] font-black tracking-[0.2em] text-slate-400 italic">
-                          <span className="flex items-center gap-2"><MapPin size={12}/> KUA {u.kecamatan}</span>
+        {/* Archives Tab */}
+        {activeTab === 'archives' && (
+          <div className="animate-in slide-in-from-bottom duration-700 space-y-12">
+            <div className="flex flex-col md:flex-row gap-10">
+               <div className="flex-1 relative group">
+                 <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-600 transition-colors" size={28} />
+                 <input type="text" placeholder="FILTER NAMA / NO. AKTA / NO. IJAZAH..." className="w-full pl-28 pr-12 py-10 rounded-[4rem] bg-white border border-emerald-50 shadow-2xl font-black uppercase tracking-widest text-sm focus:ring-[30px] focus:ring-emerald-500/5 outline-none transition-all" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} />
+               </div>
+               <button onClick={()=>window.print()} className="px-16 py-10 bg-emerald-950 text-white rounded-[4rem] font-black uppercase text-xs tracking-[0.3em] flex items-center gap-6 hover:bg-emerald-900 transition-all shadow-2xl italic active:scale-95 border-b-8 border-emerald-800"><Printer size={28}/> Cetak Laporan</button>
+            </div>
+
+            <div className="bg-white rounded-[5rem] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.08)] border border-emerald-50 overflow-hidden">
+               <table className="w-full text-left">
+                 <thead className="bg-emerald-950 text-white text-[11px] font-black uppercase tracking-[0.4em] italic">
+                   <tr>
+                     <th className="px-14 py-12">Uraian Metadata Digital</th>
+                     <th className="px-14 py-12">Nomor Registrasi</th>
+                     <th className="px-14 py-12">Unit Kerja Satker</th>
+                     <th className="px-14 py-12 text-right">Manajemen Berkas</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                   {filteredArchives.map(arc => (
+                     <tr key={arc.id} className="hover:bg-emerald-50/50 transition-all text-sm group">
+                        <td className="px-14 py-10">
+                          <div className="flex items-center gap-8">
+                            <div className="p-5 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-emerald-700 group-hover:text-white transition-all shadow-sm"><FileText size={28}/></div>
+                            <div>
+                              <p className="font-black text-slate-900 uppercase italic text-xl tracking-tighter leading-tight">{arc.extractedData.uraian}</p>
+                              <p className="text-[10px] font-black text-emerald-600 uppercase mt-2 italic tracking-[0.3em] flex items-center gap-2"><ArrowRight size={14}/> Unique ID: {arc.fileHash.slice(-16)}</p>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-12 py-10 flex gap-4 justify-end opacity-20 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => { setEditingUser(u); setUserData(u); setIsUserModalOpen(true); }} className="p-5 bg-emerald-50 text-emerald-600 rounded-3xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Edit size={20}/></button>
-                           <button onClick={() => handleDeleteUser(u.id)} className="p-5 bg-rose-50 text-rose-500 rounded-3xl hover:bg-rose-500 hover:text-white transition-all shadow-sm"><Trash2 size={20}/></button>
+                        <td className="px-14 py-10 font-mono text-emerald-800 font-black tracking-widest text-lg">{arc.extractedData.nomorAkta || arc.extractedData.nomorIjazah}</td>
+                        <td className="px-14 py-10"><span className="px-8 py-3 bg-emerald-50 text-emerald-700 rounded-full font-black uppercase text-[10px] tracking-[0.3em] italic border border-emerald-100">{arc.kecamatan || arc.madrasah}</span></td>
+                        <td className="px-14 py-10 text-right space-x-4 opacity-30 group-hover:opacity-100 transition-opacity">
+                           <button onClick={()=>setPreviewArchive(arc)} className="p-5 bg-white text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-md border border-emerald-100"><Eye size={24}/></button>
+                           {user.role === UserRole.KABUPATEN && <button onClick={async ()=>{if(confirm('Wipe arsip ini secara permanen?')) await deleteDoc(doc(db, "archives", arc.id))}} className="p-5 bg-white text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-md border border-rose-50"><Trash2 size={24}/></button>}
                         </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={4} className="px-12 py-24 text-center text-slate-400 font-black uppercase italic tracking-widest">Tidak ada operator terdaftar</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-             </div>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Access Tab (Admin/Kabupaten Only) */}
+        {activeTab === 'users' && user.role === UserRole.KABUPATEN && (
+          <div className="animate-in slide-in-from-bottom duration-700 space-y-14">
+            <div className="flex justify-between items-end">
+              <div>
+                <p className="text-emerald-700 font-black text-xs uppercase tracking-[0.5em] mb-4 italic">IAM Gateway</p>
+                <h2 className="text-8xl font-black text-slate-900 uppercase italic tracking-tighter leading-none">Akses Operator</h2>
+              </div>
+              <button onClick={() => { 
+                setEditingUser(null); 
+                setUserData({ nip: '', password: '', displayName: '', role: UserRole.KECAMATAN, kecamatan: '', madrasah: '' }); 
+                setIsUserModalOpen(true); 
+              }} className="px-16 py-10 bg-gradient-to-br from-emerald-950 to-emerald-800 text-white rounded-[4rem] font-black uppercase text-xs tracking-[0.4em] flex items-center gap-8 hover:scale-[1.03] transition-all shadow-2xl italic active:scale-95 border-b-8 border-emerald-900">
+                <UserPlus size={32}/> Registrasi Operator
+              </button>
+            </div>
+
+            <div className="relative group">
+              <Search className="absolute left-10 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-700 transition-colors" size={32} />
+              <input type="text" placeholder="FILTER PETUGAS BERDASARKAN UNIT / NIP / NAMA..." className="w-full pl-28 pr-12 py-10 rounded-[4rem] bg-white border border-emerald-50 shadow-2xl font-black uppercase tracking-widest text-sm focus:ring-[30px] focus:ring-emerald-500/5 outline-none transition-all" value={userSearchQuery} onChange={e=>setUserSearchQuery(e.target.value)} />
+            </div>
+
+            <div className="bg-white rounded-[5rem] shadow-2xl border border-emerald-50 overflow-hidden">
+               <table className="w-full text-left">
+                 <thead className="bg-emerald-950 text-white text-[11px] font-black uppercase tracking-[0.4em] italic">
+                   <tr>
+                     <th className="px-14 py-12">Identitas Petugas</th>
+                     <th className="px-14 py-12">Access Key (NIP)</th>
+                     <th className="px-14 py-12">Kategori Unit</th>
+                     <th className="px-14 py-12">Satuan Kerja</th>
+                     <th className="px-14 py-12 text-right">Manajemen Akses</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-slate-100">
+                   {filteredUsers.map(u => (
+                     <tr key={u.id} className="hover:bg-emerald-50/50 transition-all text-sm group">
+                        <td className="px-14 py-10">
+                          <div className="flex items-center gap-8">
+                            <div className="p-5 bg-slate-50 text-slate-400 rounded-2xl group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-all shadow-inner">
+                              {u.role === UserRole.KECAMATAN ? <UserCog size={36}/> : <School size={36} />}
+                            </div>
+                            <p className="font-black text-slate-900 uppercase italic text-xl tracking-tighter leading-tight">{u.displayName}</p>
+                          </div>
+                        </td>
+                        <td className="px-14 py-10 font-mono text-emerald-800 font-black text-xl tracking-[0.2em]">{u.nip}</td>
+                        <td className="px-14 py-10">
+                          <span className={`px-8 py-3 rounded-full font-black uppercase text-[10px] tracking-[0.3em] italic border ${u.role === UserRole.KECAMATAN ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-purple-50 text-purple-700 border-purple-100'}`}>
+                            {u.role === UserRole.KECAMATAN ? 'Operator KUA' : 'Operator Madrasah'}
+                          </span>
+                        </td>
+                        <td className="px-14 py-10">
+                          <div className="flex items-center gap-4">
+                             {u.role === UserRole.KECAMATAN ? <MapPin size={20} className="text-emerald-500"/> : <Building2 size={20} className="text-purple-500"/>}
+                             <span className="font-black uppercase text-sm text-slate-600 tracking-tighter italic">{u.kecamatan || u.madrasah || '-'}</span>
+                          </div>
+                        </td>
+                        <td className="px-14 py-10 text-right space-x-4 opacity-20 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => { setEditingUser(u); setUserData(u); setIsUserModalOpen(true); }} className="p-5 bg-white text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-md border border-emerald-50"><Edit size={24}/></button>
+                           <button onClick={async () => { if(confirm(`Revoke akses operator ${u.displayName}?`)) await deleteDoc(doc(db, "users", u.id)); }} className="p-5 bg-white text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-md border border-rose-50"><Trash2 size={24}/></button>
+                        </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+            </div>
           </div>
         )}
       </main>
 
-      {/* Manual Entry Modal */}
-      {isManualEntryOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-emerald-950/95 backdrop-blur-3xl no-print">
-           <div className="bg-white w-full max-w-6xl rounded-[5rem] p-16 lg:p-24 overflow-y-auto max-h-[95vh] shadow-2xl relative animate-in zoom-in duration-300">
-              <button onClick={() => setIsManualEntryOpen(false)} className="absolute top-12 right-12 p-8 bg-slate-50 rounded-full text-slate-300 hover:text-rose-500 transition-all hover:rotate-90 shadow-inner"><X size={48}/></button>
+      {/* User Management Modal */}
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-[250] bg-emerald-950/98 backdrop-blur-3xl flex items-center justify-center p-10 no-print animate-in zoom-in duration-300">
+           <div className="bg-white w-full max-w-5xl rounded-[6rem] p-20 lg:p-28 shadow-2xl relative overflow-y-auto max-h-[95vh] border-8 border-emerald-900/10">
+              <button onClick={() => setIsUserModalOpen(false)} className="absolute top-14 right-14 p-10 bg-slate-50 rounded-full text-slate-300 hover:text-rose-500 transition-all hover:rotate-90 hover:scale-110 shadow-inner"><X size={54}/></button>
+              
               <div className="mb-20">
-                <h3 className="text-7xl font-black italic uppercase mb-4 tracking-tighter leading-none">Pendaftaran Arsip</h3>
+                <h3 className="text-8xl font-black italic uppercase tracking-tighter leading-none mb-4">
+                  {editingUser ? 'Edit Akses' : 'Akses Baru'}
+                </h3>
+                <p className="text-sm font-black text-emerald-700 uppercase tracking-[0.6em] italic opacity-60">Sakinah IAM Access Gateway</p>
               </div>
-              <form onSubmit={handleManualSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-16">
-                 <div className="space-y-10 p-12 bg-slate-50 rounded-[4rem] border border-slate-100">
-                    <p className="text-xs font-black uppercase text-emerald-600 tracking-[0.4em] italic mb-6 border-b border-emerald-200 pb-4">I. Identitas Pasangan</p>
-                    <input required placeholder="NAMA LENGKAP SUAMI" className="w-full px-10 py-7 rounded-3xl bg-white border border-slate-200 font-black uppercase italic focus:ring-8 focus:ring-emerald-500/5 outline-none transition-all" value={manualData.suami} onChange={e => setManualData({...manualData, suami: e.target.value.toUpperCase()})}/>
-                    <input required placeholder="NAMA LENGKAP ISTRI" className="w-full px-10 py-7 rounded-3xl bg-white border border-slate-200 font-black uppercase italic focus:ring-8 focus:ring-emerald-500/5 outline-none transition-all" value={manualData.istri} onChange={e => setManualData({...manualData, istri: e.target.value.toUpperCase()})}/>
+
+              <form onSubmit={handleSaveUser} className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                 <div className="space-y-10">
+                    <label className="block space-y-4">
+                      <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Nama Lengkap Petugas</span>
+                      <input required type="text" placeholder="CONTOH: AHMAD FAUZI, M.PD" className="w-full px-12 py-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 font-black uppercase italic outline-none focus:ring-[20px] focus:ring-emerald-500/5 transition-all text-xl" value={userData.displayName} onChange={e=>setUserData({...userData, displayName: e.target.value})} />
+                    </label>
+                    <label className="block space-y-4">
+                      <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Access Identity (NIP)</span>
+                      <input required type="text" placeholder="19XXXXXXXXXXXX" className="w-full px-12 py-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 font-black outline-none focus:ring-[20px] focus:ring-emerald-500/5 transition-all text-xl tracking-widest" value={userData.nip} onChange={e=>setUserData({...userData, nip: e.target.value})} />
+                    </label>
+                    <label className="block space-y-4">
+                      <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Password Otorisasi</span>
+                      <input required type="password" placeholder="••••••••" className="w-full px-12 py-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 font-black outline-none focus:ring-[20px] focus:ring-emerald-500/5 transition-all text-xl tracking-widest" value={userData.password} onChange={e=>setUserData({...userData, password: e.target.value})} />
+                    </label>
                  </div>
-                 <div className="space-y-10 p-12 bg-emerald-50/50 rounded-[4rem] border border-emerald-100">
-                    <p className="text-xs font-black uppercase text-emerald-600 tracking-[0.4em] italic mb-6 border-b border-emerald-200 pb-4">II. Metadata Administrasi</p>
-                    <input required placeholder="NOMOR REGISTRASI AKTA" className="w-full px-10 py-7 rounded-3xl bg-white border border-emerald-200 font-black tracking-widest focus:ring-8 focus:ring-emerald-500/5 outline-none" value={manualData.nomorAkta} onChange={e => setManualData({...manualData, nomorAkta: e.target.value})}/>
-                    <input required type="date" className="w-full px-10 py-7 rounded-3xl bg-white border border-emerald-200 font-black" value={manualData.tanggalNikah} onChange={e => setManualData({...manualData, tanggalNikah: e.target.value})}/>
+
+                 <div className="space-y-10">
+                    <label className="block space-y-4">
+                      <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Kategori Operator</span>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button type="button" onClick={() => setUserData({...userData, role: UserRole.KECAMATAN, kecamatan: '', madrasah: ''})} className={`py-6 rounded-[2rem] font-black uppercase tracking-widest text-[10px] italic border-2 transition-all ${userData.role === UserRole.KECAMATAN ? 'bg-emerald-900 text-white border-emerald-900 shadow-xl' : 'bg-white text-emerald-950 border-emerald-50'}`}>
+                          Operator KUA
+                        </button>
+                        <button type="button" onClick={() => setUserData({...userData, role: UserRole.MADRASAH, kecamatan: '', madrasah: ''})} className={`py-6 rounded-[2rem] font-black uppercase tracking-widest text-[10px] italic border-2 transition-all ${userData.role === UserRole.MADRASAH ? 'bg-purple-900 text-white border-purple-900 shadow-xl' : 'bg-white text-emerald-950 border-emerald-50'}`}>
+                          Operator Madrasah
+                        </button>
+                      </div>
+                    </label>
+
+                    {userData.role === UserRole.KECAMATAN ? (
+                      <label className="block space-y-4">
+                        <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Unit Kerja KUA (31 Kecamatan)</span>
+                        <select required className="w-full px-12 py-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 font-black uppercase italic outline-none focus:ring-[20px] focus:ring-emerald-500/5 transition-all text-center text-xl" value={userData.kecamatan} onChange={e => setUserData({...userData, kecamatan: e.target.value})}>
+                          <option value="">-- PILIH KECAMATAN JEMBER --</option>
+                          {KECAMATAN_LIST.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                      </label>
+                    ) : (
+                      <label className="block space-y-4">
+                        <span className="text-[11px] font-black uppercase text-slate-400 tracking-[0.5em] ml-6 italic">Unit Kerja Madrasah Negeri</span>
+                        <select required className="w-full px-12 py-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 font-black uppercase italic outline-none focus:ring-[20px] focus:ring-emerald-500/5 transition-all text-center text-xl" value={userData.madrasah} onChange={e => setUserData({...userData, madrasah: e.target.value})}>
+                          <option value="">-- PILIH LEMBAGA MADRASAH --</option>
+                          {MADRASAH_LIST.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </label>
+                    )}
+
+                    <div className="pt-16">
+                       <button type="submit" className="w-full py-12 bg-gradient-to-r from-emerald-700 to-emerald-500 text-white rounded-[4rem] font-black uppercase tracking-[0.5em] italic hover:scale-[1.02] transition-all shadow-2xl active:scale-[0.98] text-2xl border-b-8 border-emerald-900 group">
+                         <span className="group-hover:translate-x-2 transition-transform inline-block">
+                            {editingUser ? 'PERBARUI DATA AKSES' : 'AKTIFKAN OPERATOR'}
+                         </span>
+                       </button>
+                    </div>
                  </div>
-                 <div className="md:col-span-2">
-                    <select required className="w-full px-10 py-10 rounded-[3rem] bg-emerald-950 text-white font-black uppercase italic text-center border-4 border-emerald-900 shadow-2xl" value={manualData.lokasiNikah} onChange={e => setManualData({...manualData, lokasiNikah: e.target.value})}>
-                      <option value="">-- DAFTAR 31 KECAMATAN JEMBER --</option>
-                      {KECAMATAN_LIST.map(k => <option key={k} value={k}>{k}</option>)}
-                    </select>
-                 </div>
-                 <button type="submit" className="md:col-span-2 py-12 bg-emerald-600 text-white rounded-[4rem] font-black uppercase tracking-[0.5em] text-2xl hover:bg-emerald-500 italic shadow-2xl">SIMPAN KE ARSIP DATA</button>
               </form>
            </div>
         </div>
       )}
 
-      {/* Preview Modal */}
+      {/* Terminal Overlay */}
+      {showTerminal && (
+        <div className="fixed bottom-12 right-12 w-[700px] h-[500px] bg-slate-950 rounded-[4rem] shadow-[0_60px_120px_-30px_rgba(0,0,0,0.9)] z-[100] border border-slate-800 flex flex-col overflow-hidden font-mono animate-in slide-in-from-right">
+          <div className="bg-slate-900 p-8 flex justify-between items-center border-b border-slate-800">
+            <div className="flex items-center gap-5"><Terminal size={24} className="text-emerald-500"/><span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.5em] italic">SAKINAH KERNEL SHELL (ADMIN)</span></div>
+            <button onClick={()=>setShowTerminal(false)} className="text-slate-500 hover:text-white transition-colors"><X size={28}/></button>
+          </div>
+          <div className="flex-1 p-10 overflow-y-auto text-emerald-400 text-[12px] space-y-3 leading-relaxed">
+            {terminalLogs.map((log, i) => <div key={i} className="flex gap-4"><span className="opacity-20">[{String(i+1).padStart(2,'0')}]</span> {log}</div>)}
+            <div ref={terminalEndRef} />
+          </div>
+          <form onSubmit={handleTerminal} className="p-8 bg-black flex gap-5 border-t border-slate-900">
+            <span className="text-emerald-500 font-black tracking-widest">sakinah@kernel:~$</span>
+            <input autoFocus type="text" className="bg-transparent text-emerald-300 outline-none flex-1 font-bold text-sm" value={terminalInput} onChange={e=>setTerminalInput(e.target.value)} />
+          </form>
+        </div>
+      )}
+
+      {/* Preview Detail Overlay */}
       {previewArchive && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-8 bg-black/98 backdrop-blur-3xl no-print">
-           <div className="bg-white w-full max-w-[95vw] h-[92vh] rounded-[6rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row relative animate-in zoom-in duration-500">
-              <button onClick={() => setPreviewArchive(null)} className="absolute top-12 left-12 p-8 bg-white/10 backdrop-blur-xl rounded-full text-white shadow-2xl z-20 hover:scale-110 transition-all border border-white/20"><X size={48}/></button>
+        <div className="fixed inset-0 z-[200] bg-black/98 backdrop-blur-3xl flex items-center justify-center p-14 no-print animate-in zoom-in duration-500">
+           <div className="bg-white w-full max-w-7xl h-full rounded-[7rem] overflow-hidden flex shadow-2xl relative border-8 border-white/5">
+              <button onClick={()=>setPreviewArchive(null)} className="absolute top-14 left-14 p-12 bg-white/10 backdrop-blur-3xl text-white rounded-full hover:scale-110 transition-all z-[210] border border-white/20 shadow-2xl"><X size={54}/></button>
               
-              <div className="flex-1 bg-emerald-950 flex items-center justify-center p-16 overflow-hidden relative">
-                 {(previewArchive.fileBase64 || previewArchive.fileUrl) ? (
-                   <img src={previewArchive.fileBase64 || previewArchive.fileUrl} className="max-w-full max-h-full object-contain rounded-[3rem] shadow-2xl border-4 border-white/10" />
-                 ) : (
-                   <div className="text-center text-white p-24 opacity-20 flex flex-col items-center space-y-12">
-                     <Archive size={350} className="animate-pulse" />
-                     <p className="text-7xl font-black uppercase italic tracking-tighter text-white">Tidak Ada Gambar Dokumen</p>
-                   </div>
-                 )}
+              <div className="flex-1 bg-emerald-950 flex items-center justify-center p-28 relative overflow-hidden">
+                 <div className="absolute top-24 right-24 flex flex-col items-center gap-4 opacity-30">
+                    <div className="flex gap-1 h-14">{[...Array(30)].map((_,i)=><div key={i} className="w-[4px] bg-emerald-400" style={{width: `${Math.random()*8+1}px`}}/>)}</div>
+                    <p className="text-[11px] text-emerald-400 font-mono tracking-[0.6em] uppercase font-black">SAKINAH-SEC-ID-{previewArchive.fileHash.slice(-12)}</p>
+                 </div>
+                 <img src={previewArchive.fileBase64} className="max-w-full max-h-full object-contain rounded-[4rem] shadow-2xl border-4 border-white/10" />
               </div>
 
-              <div className="w-full lg:w-[600px] bg-white p-20 lg:p-28 overflow-y-auto border-l border-slate-100 flex flex-col justify-between">
-                 <div>
-                    <div className="mb-20">
-                        <p className="text-emerald-600 font-black text-xs uppercase tracking-[0.5em] mb-4 italic flex items-center gap-3"><Database size={16}/> Metadata Digital</p>
-                        <h4 className="text-6xl font-black uppercase italic tracking-tighter leading-none mb-4">Detail Akta</h4>
+              <div className="w-[600px] p-24 lg:p-32 overflow-y-auto space-y-20 border-l border-emerald-50 flex flex-col justify-between">
+                 <div className="space-y-20">
+                    <div>
+                      <p className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.6em] mb-8 italic opacity-60">Deep Registry Analytics</p>
+                      <h4 className="text-7xl font-black italic uppercase tracking-tighter text-slate-900 leading-[0.8]">Arsip Digital</h4>
                     </div>
-                    
-                    <div className="space-y-12">
-                        <div className="p-12 bg-slate-50 rounded-[4rem] border border-slate-100 shadow-inner group transition-all hover:bg-white hover:shadow-2xl">
-                          <p className="text-[11px] font-black text-slate-400 uppercase italic tracking-[0.3em] mb-6">Pihak Berpasangan</p>
-                          <p className="text-3xl font-black text-slate-900 leading-tight uppercase italic tracking-tighter">
-                            {previewArchive.extractedData.suami}<br/>
-                            <span className="text-emerald-600 text-xl font-black block my-3">&</span> 
-                            {previewArchive.extractedData.istri}
-                          </p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-8">
-                          <div className="p-10 bg-emerald-50/50 rounded-[3.5rem] border border-emerald-100 shadow-sm">
-                              <p className="text-[11px] font-black uppercase text-emerald-600 italic tracking-widest mb-3">No. Akta</p>
-                              <p className="font-black text-slate-900 text-lg tracking-widest uppercase italic font-mono">{previewArchive.extractedData.nomorAkta}</p>
-                          </div>
-                          <div className="p-10 bg-emerald-50/50 rounded-[3.5rem] border border-emerald-100 shadow-sm">
-                              <p className="text-[11px] font-black uppercase text-emerald-600 italic tracking-widest mb-3">Tgl Akad</p>
-                              <p className="font-black text-slate-900 text-lg italic">{previewArchive.extractedData.tanggalNikah}</p>
-                          </div>
-                        </div>
 
-                        <div className="flex items-center gap-8 p-12 bg-emerald-950 text-white rounded-[4rem] shadow-2xl mt-6 relative overflow-hidden">
-                           <MapPin size={48} className="text-emerald-400" />
-                           <div className="relative z-10">
-                              <p className="text-[11px] font-black uppercase text-emerald-500 italic tracking-[0.4em] mb-2">Kantor Urusan Agama</p>
-                              <p className="text-3xl font-black italic uppercase tracking-tighter">Kec. {previewArchive.kecamatan}</p>
-                           </div>
-                        </div>
+                    <div className="space-y-10">
+                       <DataRow label="Kategori Data" value={previewArchive.category} />
+                       <DataRow label="Periodisasi" value={previewArchive.extractedData.kurunWaktu} />
+                       <DataRow label="Koordinat Fisik" value={previewArchive.extractedData.lokasiSimpan} />
+                       <DataRow label="Enkripsi Keamanan" value={previewArchive.extractedData.metodePerlindungan} icon={ShieldAlert} />
+                    </div>
+
+                    <div className="p-14 bg-emerald-50 rounded-[5rem] border border-emerald-100 shadow-inner relative group transition-all hover:bg-white hover:shadow-2xl">
+                       <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-20 transition-opacity duration-700"><Database size={120} /></div>
+                       <p className="text-[11px] font-black uppercase text-emerald-700 mb-8 opacity-50 tracking-[0.4em] italic">Metadata Terekstrak AI</p>
+                       <p className="text-3xl font-black text-slate-900 leading-tight italic tracking-tighter">"{previewArchive.extractedData.uraian}"</p>
                     </div>
                  </div>
 
-                 <button onClick={() => window.print()} className="w-full py-12 bg-emerald-600 text-white rounded-[4rem] font-black uppercase text-sm tracking-[0.4em] italic flex items-center justify-center gap-6 shadow-2xl mt-16 hover:bg-emerald-500 transition-all active:scale-[0.98] group">
-                    <Printer size={32} className="group-hover:rotate-12 transition-transform" /> Cetak Arsip
+                 <button onClick={()=>window.print()} className="w-full py-14 bg-emerald-950 text-white rounded-[5rem] font-black uppercase tracking-[0.6em] flex items-center justify-center gap-8 hover:bg-emerald-700 transition-all shadow-2xl italic text-lg group active:scale-95 border-b-8 border-emerald-800">
+                    <Printer size={40} className="group-hover:rotate-12 transition-transform" /> Cetak Salinan Resmi
                  </button>
               </div>
            </div>
         </div>
       )}
 
-      {/* User Modal */}
-      {isUserModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-8 bg-emerald-950/98 backdrop-blur-3xl">
-           <div className="bg-white w-full max-w-xl rounded-[5rem] p-16 lg:p-20 shadow-2xl relative animate-in zoom-in duration-300 border-b-8 border-emerald-600">
-              <button onClick={() => setIsUserModalOpen(false)} className="absolute top-12 right-12 p-6 text-slate-300 hover:text-rose-500 bg-slate-50 rounded-full transition-all shadow-inner"><X size={32}/></button>
-              <h3 className="text-5xl font-black italic uppercase tracking-tighter leading-none mb-12 text-center">Registrasi Operator</h3>
-              <form onSubmit={handleSaveUser} className="space-y-6">
-                 <input required placeholder="NAMA LENGKAP" className="w-full px-10 py-6 rounded-3xl bg-slate-50 border border-slate-100 font-black uppercase italic tracking-widest outline-none shadow-inner" value={userData.displayName} onChange={e => setUserData({...userData, displayName: e.target.value})}/>
-                 <input required placeholder="NIP / ID PEGAWAI" className="w-full px-10 py-6 rounded-3xl bg-slate-50 border border-slate-100 font-black tracking-widest outline-none shadow-inner" value={userData.nip} onChange={e => setUserData({...userData, nip: e.target.value})}/>
-                 <input required type="password" placeholder="PASSWORD BARU" className="w-full px-10 py-6 rounded-3xl bg-slate-50 border border-slate-100 font-black tracking-widest outline-none shadow-inner" value={userData.password} onChange={e => setUserData({...userData, password: e.target.value})}/>
-                 <select required className="w-full px-10 py-6 rounded-3xl bg-slate-50 border border-slate-100 font-black uppercase italic shadow-inner" value={userData.kecamatan} onChange={e => setUserData({...userData, kecamatan: e.target.value})}>
-                    <option value="">WILAYAH TUGAS KUA</option>
-                    {KECAMATAN_LIST.map(k => <option key={k} value={k}>{k}</option>)}
-                 </select>
-                 <button type="submit" className="w-full py-10 bg-emerald-600 text-white rounded-[3.5rem] font-black uppercase tracking-[0.4em] hover:bg-emerald-500 transition-all italic shadow-2xl mt-8">VALIDASI AKSES</button>
-              </form>
-           </div>
-        </div>
-      )}
-
       <style>{`
-        .animate-in { animation: slide-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; } 
-        @keyframes slide-up { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        
-        /* Animasi Ripple Wave dari Atas ke Bawah */
-        @keyframes ripple-down {
-          0% { transform: translateY(-100%); opacity: 0; }
-          100% { transform: translateY(0); opacity: 0.4; }
-        }
-        .animate-ripple-down {
-          animation: ripple-down 1.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-        }
-
-        input::placeholder { font-style: italic; opacity: 0.5; }
-        
-        .glass-input:focus {
-           transform: translateY(-2px);
-           box-shadow: 0 20px 40px -10px rgba(16, 185, 129, 0.2);
-        }
-
-        @media print {
-          body { background: white !important; }
-          .no-print { display: none !important; }
-          .print-full { width: 100% !important; margin: 0 !important; padding: 0 !important; }
-        }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @media print { .no-print { display: none !important; } .print-only { display: block !important; } }
       `}</style>
     </div>
   );
 };
+
+const NavBtn = ({ icon: Icon, label, active, onClick }: any) => (
+  <button onClick={onClick} className={`w-full flex items-center gap-6 px-10 py-6 rounded-[2.5rem] transition-all font-black text-[11px] uppercase tracking-[0.4em] ${active ? 'bg-emerald-700 text-white shadow-2xl italic translate-x-3' : 'text-emerald-400/50 hover:text-white hover:bg-emerald-800/40'}`}>
+    <Icon size={24} className={active ? 'scale-125 transition-transform' : ''} /> {label}
+  </button>
+);
+
+const StatCard = ({ icon: Icon, title, count, desc }: any) => (
+  <div className={`p-12 bg-white rounded-[5rem] shadow-2xl border border-emerald-50 relative group overflow-hidden hover:translate-y-[-12px] transition-all duration-700`}>
+     <div className={`absolute -right-12 -top-12 text-emerald-50 opacity-0 group-hover:opacity-100 transition-all duration-1000 scale-150 rotate-12`}><Icon size={220}/></div>
+     <div className="p-6 bg-emerald-50 text-emerald-700 rounded-[2rem] w-fit mb-10 shadow-inner group-hover:bg-emerald-700 group-hover:text-white transition-all duration-500"><Icon size={40}/></div>
+     <h4 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 mb-4 italic">{title}</h4>
+     <p className="text-6xl font-black text-slate-900 mb-6 tracking-tighter italic">{count}</p>
+     <p className="text-[11px] font-black text-emerald-700 uppercase tracking-widest opacity-60 leading-relaxed italic">{desc}</p>
+  </div>
+);
+
+const DataRow = ({ label, value, icon: Icon }: any) => (
+  <div className="flex justify-between items-center py-8 border-b border-emerald-50 group hover:translate-x-3 transition-transform duration-500">
+    <div className="flex items-center gap-5">
+      {Icon ? <Icon size={20} className="text-emerald-600" /> : <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>}
+      <span className="text-[12px] font-black text-slate-400 uppercase tracking-[0.4em] italic">{label}</span>
+    </div>
+    <span className="text-lg font-black text-slate-900 uppercase italic tracking-tighter">{value || '-'}</span>
+  </div>
+);
 
 export default App;

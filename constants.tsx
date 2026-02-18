@@ -1,19 +1,25 @@
-
 import React from 'react';
 
-export const APP_NAME = "SIARNI JEMBER";
-export const APP_DESCRIPTION = "Sistem Informasi Arsip Nikah Digital Jember";
+export const APP_NAME = "SAKINAH";
+export const APP_DESCRIPTION = "Sistem Arsip KUA, Ijazah, Nikah, dan Administrasi Handal";
 export const KEMENAG_LOGO = "https://www.freepnglogos.com/uploads/logo-kemenag-png/logo-kementerian-agama-gambar-logo-depag-png-0.png";
 
 export const Watermark = () => (
   <div className="watermark-overlay fixed inset-0 pointer-events-none select-none z-[999999] hidden print:flex flex-col items-center justify-center overflow-hidden">
-    <div className="grid grid-cols-3 gap-x-20 gap-y-40 transform rotate-[-30deg] scale-125 opacity-[0.2]">
-      {[...Array(15)].map((_, i) => (
-        <div key={i} className="text-[4vw] font-black text-slate-900 whitespace-nowrap uppercase tracking-[0.3em] italic border-y-2 border-slate-900 py-4 px-8 text-center leading-tight">
-          SIARNI JEMBER<br/>
-          <span className="text-[1.5vw] tracking-[0.5em] font-bold opacity-80">ARSIP DIGITAL KEMENAG</span>
+    <div className="grid grid-cols-2 gap-x-20 gap-y-40 transform rotate-[-25deg] scale-150 opacity-[0.07]">
+      {[...Array(12)].map((_, i) => (
+        <div key={i} className="text-[5vw] font-black text-emerald-900 whitespace-nowrap uppercase tracking-[0.2em] italic border-y-4 border-emerald-900 py-6 px-12 text-center leading-tight">
+          ARSIP KEMENAG JEMBER<br/>
+          <span className="text-[2vw] tracking-[0.8em] font-bold opacity-80">VERIFIKASI DIGITAL - SAKINAH</span>
         </div>
       ))}
+    </div>
+    {/* Visual Barcode on Print Bottom */}
+    <div className="absolute bottom-10 right-10 flex flex-col items-center opacity-40">
+       <div className="flex gap-1 h-8">
+         {[...Array(30)].map((_, i) => <div key={i} className="w-[1.5px] bg-black" style={{ height: `${Math.random() * 20 + 10}px` }} />)}
+       </div>
+       <p className="text-[8px] font-mono font-bold mt-1">SAKINAH-JEMBER-SEC-V1</p>
     </div>
   </div>
 );

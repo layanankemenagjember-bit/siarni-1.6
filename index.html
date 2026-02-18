@@ -3,85 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIARNI JEMBER - Digital Archive</title>
+    <title>SAKINAH JEMBER - Enterprise Digital Archive</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Google API Loader -->
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
     <style>
         body { 
             font-family: 'Plus Jakarta Sans', sans-serif;
             margin: 0;
             overflow-x: hidden;
+            background-color: #022c22;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
 
+        /* Deep Green/Emerald Gradient Background */
         .bg-container {
             position: fixed;
             inset: 0;
-            background: radial-gradient(circle at top right, #064e3b, #022c22);
+            background: radial-gradient(circle at center, #065f46 0%, #022c22 100%);
             z-index: -2;
             overflow: hidden;
         }
 
-        .liquid-shape {
+        /* 3D Tube/Squiggle Shapes Simulation - Emerald Edition */
+        .shape {
             position: absolute;
-            filter: blur(80px);
+            filter: drop-shadow(15px 15px 30px rgba(0,0,0,0.5));
+            z-index: -1;
+            opacity: 0.8;
+        }
+
+        .tube-spiral {
+            width: 300px;
+            height: 300px;
+            border: 40px solid #10b981;
             border-radius: 50%;
-            opacity: 0.6;
-            animation: move 25s infinite alternate ease-in-out;
+            border-bottom-color: transparent;
+            border-right-color: transparent;
+            transform: rotate(45deg);
+            filter: blur(1px) drop-shadow(20px 20px 40px rgba(0,0,0,0.6));
         }
 
-        .shape-1 { width: 600px; height: 600px; top: -150px; left: -150px; background: rgba(16, 185, 129, 0.3); }
-        .shape-2 { width: 700px; height: 700px; bottom: -200px; right: -150px; background: rgba(6, 78, 59, 0.5); }
-        .shape-3 { width: 400px; height: 400px; top: 20%; right: 10%; background: rgba(52, 211, 153, 0.15); animation-duration: 15s; }
-
-        @keyframes move {
-            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-            100% { transform: translate(120px, 80px) scale(1.1) rotate(15deg); }
+        .tube-wave {
+            width: 200px;
+            height: 80px;
+            background: linear-gradient(to right, #10b981, #059669);
+            border-radius: 40px;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.3), inset 10px 10px 20px rgba(255,255,255,0.2);
         }
 
-        /* Ripple Waves at Top */
-        .waves-top {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 250px;
-            opacity: 0.4;
-            pointer-events: none;
-        }
-
-        .glass-card {
+        .glass-login-v2 {
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(30px);
             -webkit-backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5);
         }
 
-        .glass-input {
-            background: rgba(255, 255, 255, 0.95) !important;
-            color: #1e293b !important;
+        /* Animation for background shapes */
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
         }
+        .animate-float {
+            animation: float 10s infinite ease-in-out;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #022c22; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
 
         @media print {
             .no-print { display: none !important; }
-        }
-
-        /* Wave Animation */
-        .parallax > use {
-            animation: move-forever 25s cubic-bezier(.55,.5,.45,.5) infinite;
-        }
-        .parallax > use:nth-child(1) { animation-delay: -2s; animation-duration: 7s; }
-        .parallax > use:nth-child(2) { animation-delay: -3s; animation-duration: 10s; }
-        .parallax > use:nth-child(3) { animation-delay: -4s; animation-duration: 13s; }
-        .parallax > use:nth-child(4) { animation-delay: -5s; animation-duration: 20s; }
-        @keyframes move-forever {
-            0% { transform: translate3d(-90px,0,0); }
-            100% { transform: translate3d(85px,0,0); }
+            body { background: white !important; }
         }
     </style>
 <script type="importmap">
@@ -95,8 +90,7 @@
     "firebase/": "https://esm.sh/firebase@^12.9.0/",
     "@firebase/app": "https://esm.sh/@firebase/app@^0.14.8",
     "@firebase/auth": "https://esm.sh/@firebase/auth@^1.12.0",
-    "@firebase/firestore": "https://esm.sh/@firebase/firestore@^4.11.0",
-    "@firebase/storage": "https://esm.sh/@firebase/storage@^0.14.0"
+    "@firebase/firestore": "https://esm.sh/@firebase/firestore@^4.11.0"
   }
 }
 </script>
