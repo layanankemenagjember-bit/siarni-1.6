@@ -14,28 +14,30 @@ export const extractArchiveData = async (base64Data: string, mimeType: string = 
             },
           },
           {
-            text: `Extract data from this document for the SIARNI JEMBER digital archive system.
-            Identify if this is a MARRIAGE CERTIFICATE (Buku Nikah) or an EDUCATIONAL DIPLOMA (Ijazah).
+            text: `Extract data from this document for the AMANAH JEMBER digital archive system.
+            Identify if this is a MARRIAGE CERTIFICATE (Buku Nikah / Akta Nikah) or an EDUCATIONAL DIPLOMA (Ijazah).
             RETURN ONLY JSON.
 
-            FOR MARRIAGE CERTIFICATES:
+            FOR MARRIAGE CERTIFICATES (Buku Nikah / Akta Nikah):
             - category: "PERNIKAHAN"
-            - suami: Husband's name
-            - istri: Wife's name
-            - nomorAkta: Registration number
-            - tanggalNikah: YYYY-MM-DD
+            - suami: Husband's full name (Nama Lengkap Suami)
+            - istri: Wife's full name (Nama Lengkap Istri)
+            - nomorAkta: Registration number (Nomor Akta / No. Akta)
+            - tanggalNikah: YYYY-MM-DD (Tanggal Pernikahan)
+            - lokasiNikah: Kecamatan (District, e.g., AJUNG, AMBULU)
+            - kurunWaktu: Year of marriage (YYYY)
             - uraian: "Akta Nikah a.n. [SUAMI] dan [ISTRI]"
 
             FOR DIPLOMAS (IJAZAH):
             - category: "PENDIDIKAN"
-            - namaSiswa: Student's name
-            - nomorIjazah: Serial number
-            - tanggalLulus: Graduation date
-            - namaSekolah: School name
+            - namaSiswa: Student's name (Nama Lengkap Siswa)
+            - nomorIjazah: Serial number (Nomor Ijazah)
+            - tanggalLulus: Graduation date (Tanggal Lulus)
+            - namaSekolah: School name (Nama Madrasah/Sekolah)
+            - kurunWaktu: Year of graduation (YYYY)
             - uraian: "Ijazah a.n. [NAMASISWA] ([NAMASEKOLAH])"
 
             COMMON FIELDS:
-            - kurunWaktu: Year (YYYY)
             - mediaSimpan: "Kertas"
             - jangkaSimpan: "Permanen"
             - tingkatPerkembangan: "Asli"`,
